@@ -11,6 +11,10 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import nl.enjarai.doabarrelroll.api.RollEntity;
+import nl.enjarai.doabarrelroll.DoABarrelRollClient;
+import nl.enjarai.doabarrelroll.config.ModConfig;
+
+import java.lang.reflect.Field;
 
 @EventBusSubscriber(modid = ElytraDragNeoForge.MODID, value = Dist.CLIENT)
 public class ClientEvents {
@@ -30,44 +34,53 @@ public class ClientEvents {
         boolean isBraking = KeyBindings.BRAKE_KEY.isDown();
 
         if (isBraking && !player.onGround()) {
+            // 核心大招 1：踩刹车时，直接关掉 DaBR 的引擎！
+            setDaBREnabled(false);
+
             applyBrake(player);
 
-            // 刹车时：把当前的旋转同步，防止插值画面抽搐
+            // 锁死视角插值，防止画面抽搐
             player.yRotO = player.getYRot();
             player.xRotO = player.getXRot();
         }
 
-        // 核心修复：松开刹车的瞬间
+        // 核心大招 2：松开刹车的瞬间
         if (wasBraking && !isBraking) {
-            // 1. 清理 DaBR 的 Roll 倾斜
+            // 1. 清空实体 Roll
             if (player instanceof RollEntity rollEntity) {
                 rollEntity.doABarrelRoll$setRolling(false);
                 rollEntity.doABarrelRoll$setRoll(0.0f);
             }
 
-            // 2. 终极绝杀：强行重置坐标系的旋转缓存！
-            // 这会让任何残余的偏航、俯仰角动量立刻在物理引擎中清零。
-            // 无论 DaBR 在底层怎么算，我们直接给它来个重装系统。
-            player.setYRot(player.getYRot());
-            player.setXRot(player.getXRot());
-            player.yRotO = player.getYRot();
-            player.xRotO = player.getXRot();
-            player.setDeltaMovement(player.getDeltaMovement()); // 刷新物理向量
+            // 2. 强行重置视角动量
+            float currentYaw = player.getYRot();
+            float currentPitch = player.getXRot();
+            player.setYRot(currentYaw);
+            player.setXRot(currentPitch);
+            player.yRotO = currentYaw;
+            player.xRotO = currentPitch;
+
+            // 3. 清空 DaBR 内部平滑器的残余角动量（防止唤醒后立刻起飞）
+            clearDaBRSmoothers();
+
+            // 4. 重新唤醒 DaBR
+            setDaBREnabled(true);
         }
 
         wasBraking = isBraking;
     }
 
     private static void applyBrake(Player player) {
-        // 物理减速代码（保持不变）
         Vec3 velocity = player.getDeltaMovement();
         double speed = velocity.length();
+
         double minSpeed = ElytraDragConfig.INSTANCE.minimumSpeed.get();
         double multiplier = ElytraDragConfig.INSTANCE.dragMultiplier.get();
 
         if (speed > minSpeed) {
             double dragFactor = 1.0D - (0.05D * multiplier);
             dragFactor = Math.max(0.01D, dragFactor);
+
             Vec3 newVelocity = velocity.scale(dragFactor);
             if (newVelocity.length() < 0.1D) newVelocity = Vec3.ZERO;
 
@@ -85,6 +98,39 @@ public class ClientEvents {
             player.fallDistance = 1.0f;
         } else if (player.fallDistance > maxFall) {
             player.fallDistance = maxFall;
+        }
+    }
+
+    // 反射拨动 DaBR 总开关
+    private static void setDaBREnabled(boolean enabled) {
+        try {
+            ModConfig.INSTANCE.setModEnabled(enabled);
+        } catch (Exception e) {
+            // 忽略可能的异常
+        }
+    }
+
+    // 反射清空平滑器
+    private static void clearDaBRSmoothers() {
+        try {
+            Field yawField = DoABarrelRollClient.class.getDeclaredField("YAW_SMOOTHER");
+            Field pitchField = DoABarrelRollClient.class.getDeclaredField("PITCH_SMOOTHER");
+            Field rollField = DoABarrelRollClient.class.getDeclaredField("ROLL_SMOOTHER");
+
+            yawField.setAccessible(true);
+            pitchField.setAccessible(true);
+            rollField.setAccessible(true);
+
+            Object yawSmoother = yawField.get(null);
+            Object pitchSmoother = pitchField.get(null);
+            Object rollSmoother = rollField.get(null);
+
+            if (yawSmoother != null) yawSmoother.getClass().getMethod("reset").invoke(yawSmoother);
+            if (pitchSmoother != null) pitchSmoother.getClass().getMethod("reset").invoke(pitchSmoother);
+            if (rollSmoother != null) rollSmoother.getClass().getMethod("reset").invoke(rollSmoother);
+
+        } catch (Exception e) {
+            ElytraDragNeoForge.LOGGER.warn("Failed to clear DaBR smoothers: " + e.getMessage());
         }
     }
 }
