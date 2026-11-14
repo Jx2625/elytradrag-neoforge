@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "minVersion": "0.8.5",
+  "package": "com.muyu.elytradrag.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [],
+  "client": [
+    "DaBRYawMixin",
+    "FireworkRocketEntityMixin",
+    "PlayerShiftMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

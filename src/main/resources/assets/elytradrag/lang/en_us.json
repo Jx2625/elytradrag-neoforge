@@ -1,0 +1,13 @@
+{
+  "key.elytradrag.category": "Elytra Drag",
+  "key.elytradrag.brake": "Air Brake",
+
+  "elytradrag.configuration.dragMultiplier": "Drag Multiplier",
+  "elytradrag.configuration.dragMultiplier.tooltip": "Higher values mean stronger braking.\nRecommended: 2.0 ~ 10.0",
+
+  "elytradrag.configuration.maxFallDistance": "Max Fall Distance",
+  "elytradrag.configuration.maxFallDistance.tooltip": "Prevents massive fall damage when diving at high speeds.",
+
+  "elytradrag.configuration.minimumSpeed": "Minimum Speed",
+  "elytradrag.configuration.minimumSpeed.tooltip": "Drag stops applying below this speed, preventing jittering while hovering."
+}
