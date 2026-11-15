@@ -34,7 +34,7 @@ public class ClientEvents {
         boolean isBraking = KeyBindings.BRAKE_KEY.isDown();
 
         if (isBraking && !player.onGround()) {
-            // 核心大招 1：踩刹车时，直接关掉 DaBR 的引擎！
+            // 核心 1：踩刹车时，直接关掉 DaBR 的引擎！
             setDaBREnabled(false);
 
             applyBrake(player);
@@ -44,15 +44,15 @@ public class ClientEvents {
             player.xRotO = player.getXRot();
         }
 
-        // 核心大招 2：松开刹车的瞬间
+        // 核心 2：松开刹车的瞬间
         if (wasBraking && !isBraking) {
-            // 1. 清空实体 Roll
+            //  清空实体 Roll
             if (player instanceof RollEntity rollEntity) {
                 rollEntity.doABarrelRoll$setRolling(false);
                 rollEntity.doABarrelRoll$setRoll(0.0f);
             }
 
-            // 2. 强行重置视角动量
+            //  强行重置视角动量
             float currentYaw = player.getYRot();
             float currentPitch = player.getXRot();
             player.setYRot(currentYaw);
@@ -60,10 +60,10 @@ public class ClientEvents {
             player.yRotO = currentYaw;
             player.xRotO = currentPitch;
 
-            // 3. 清空 DaBR 内部平滑器的残余角动量（防止唤醒后立刻起飞）
+            //  清空 DaBR 内部平滑器的残余角动量（防止唤醒后立刻起飞）
             clearDaBRSmoothers();
 
-            // 4. 重新唤醒 DaBR
+            //  重新唤醒 DaBR
             setDaBREnabled(true);
         }
 

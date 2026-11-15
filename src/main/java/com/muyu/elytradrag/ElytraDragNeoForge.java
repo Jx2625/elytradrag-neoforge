@@ -14,7 +14,6 @@ import org.slf4j.LoggerFactory; // 加上这个导入
 public class ElytraDragNeoForge {
     public static final String MODID = "elytradrag";
 
-    // 加上这一行定义 LOGGER
     public static final Logger LOGGER = LoggerFactory.getLogger(MODID);
 
     public ElytraDragNeoForge(IEventBus modEventBus, ModContainer modContainer) {
