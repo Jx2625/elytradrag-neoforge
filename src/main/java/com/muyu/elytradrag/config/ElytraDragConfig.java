@@ -19,18 +19,13 @@ public class ElytraDragConfig {
     }
 
     private ElytraDragConfig(ModConfigSpec.Builder builder) {
-        // 客户端分类
-        builder.push("client");
+
         dragMultiplier = builder
                 .defineInRange("dragMultiplier", 2.0D, 0.1D, 20.0D);
         minimumSpeed = builder
                 .defineInRange("minimumSpeed", 0.1D, 0.0D, 5.0D);
-        builder.pop();
-
-        // 服务端分类
-        builder.push("server");
         maxFallDistance = builder
                 .defineInRange("maxFallDistance", 15.0D, 0.0D, 100.0D);
-        builder.pop();
+
     }
 }
