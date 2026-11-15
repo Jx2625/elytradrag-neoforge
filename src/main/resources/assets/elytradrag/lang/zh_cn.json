@@ -2,12 +2,14 @@
   "key.elytradrag.category": "鞘翅刹车",
   "key.elytradrag.brake": "空中刹车",
 
-  "elytradrag.configuration.dragMultiplier": "阻力系数（减速幅度）",
-  "elytradrag.configuration.dragMultiplier.tooltip": "数值越大，刹车越猛。\n建议范围：2.0 ~ 10.0。",
+  "elytradrag.configuration.common.client": "客户端设置",
+  "elytradrag.configuration.common.client.dragMultiplier": "阻力系数（减速幅度）",
+  "elytradrag.configuration.common.client.dragMultiplier.tooltip": "数值越大，刹车越猛。\n建议范围：2.0 ~ 10.0。",
 
-  "elytradrag.configuration.maxFallDistance": "最大摔落距离",
-  "elytradrag.configuration.maxFallDistance.tooltip": "防止在极速刹车俯冲时受到巨额摔落伤害。",
+  "elytradrag.configuration.common.client.minimumSpeed": "最小生效速度",
+  "elytradrag.configuration.common.client.minimumSpeed.tooltip": "当速度低于此数值时，停止计算阻力，防止在空中悬停时抽搐。",
 
-  "elytradrag.configuration.minimumSpeed": "最小生效速度",
-  "elytradrag.configuration.minimumSpeed.tooltip": "当速度低于此数值时，停止计算阻力，防止在空中悬停时抽搐。"
+  "elytradrag.configuration.common.server": "服务端设置",
+  "elytradrag.configuration.common.server.maxFallDistance": "最大摔落距离",
+  "elytradrag.configuration.common.server.maxFallDistance.tooltip": "防止在极速刹车俯冲时受到巨额摔落伤害。\n注意：本选项由服务端控制。"
 }

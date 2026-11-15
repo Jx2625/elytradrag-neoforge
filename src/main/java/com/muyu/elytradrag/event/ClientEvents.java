@@ -3,6 +3,7 @@ package com.muyu.elytradrag.event;
 import com.muyu.elytradrag.ElytraDragNeoForge;
 import com.muyu.elytradrag.KeyBindings;
 import com.muyu.elytradrag.config.ElytraDragConfig;
+import com.muyu.elytradrag.network.BrakeStatePacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
@@ -10,6 +11,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
 import nl.enjarai.doabarrelroll.api.RollEntity;
 import nl.enjarai.doabarrelroll.DoABarrelRollClient;
 import nl.enjarai.doabarrelroll.config.ModConfig;
@@ -33,10 +35,14 @@ public class ClientEvents {
 
         boolean isBraking = KeyBindings.BRAKE_KEY.isDown();
 
-        if (isBraking && !player.onGround()) {
-            // 核心 1：踩刹车时，直接关掉 DaBR 的引擎！
-            setDaBREnabled(false);
+        // 1. 当刹车状态发生改变时，发送网络包给服务端！
+        if (isBraking != wasBraking) {
+            PacketDistributor.sendToServer(new BrakeStatePacket(isBraking));
+        }
 
+        // 2. 踩刹车时的客户端逻辑
+        if (isBraking && !player.onGround()) {
+            setDaBREnabled(false);
             applyBrake(player);
 
             // 锁死视角插值，防止画面抽搐
@@ -44,15 +50,15 @@ public class ClientEvents {
             player.xRotO = player.getXRot();
         }
 
-        // 核心 2：松开刹车的瞬间
+        // 3. 松开刹车的瞬间
         if (wasBraking && !isBraking) {
-            //  清空实体 Roll
+            // 清空实体 Roll
             if (player instanceof RollEntity rollEntity) {
                 rollEntity.doABarrelRoll$setRolling(false);
                 rollEntity.doABarrelRoll$setRoll(0.0f);
             }
 
-            //  强行重置视角动量
+            // 强行重置视角动量
             float currentYaw = player.getYRot();
             float currentPitch = player.getXRot();
             player.setYRot(currentYaw);
@@ -60,16 +66,16 @@ public class ClientEvents {
             player.yRotO = currentYaw;
             player.xRotO = currentPitch;
 
-            //  清空 DaBR 内部平滑器的残余角动量（防止唤醒后立刻起飞）
+            // 清空 DaBR 内部平滑器的残余角动量
             clearDaBRSmoothers();
-
-            //  重新唤醒 DaBR
+            // 重新唤醒 DaBR
             setDaBREnabled(true);
         }
 
         wasBraking = isBraking;
     }
 
+    // 纯减速逻辑（防摔已经抽离到服务端）
     private static void applyBrake(Player player) {
         Vec3 velocity = player.getDeltaMovement();
         double speed = velocity.length();
@@ -93,12 +99,7 @@ public class ClientEvents {
             player.startFallFlying();
         }
 
-        float maxFall = (float) (double) ElytraDragConfig.INSTANCE.maxFallDistance.get();
-        if (player.getDeltaMovement().y > -1.0f && player.fallDistance > 1.0f) {
-            player.fallDistance = 1.0f;
-        } else if (player.fallDistance > maxFall) {
-            player.fallDistance = maxFall;
-        }
+        // 注意：这里删掉了 FallProtection 的调用，因为它现在在服务端跑了！
     }
 
     // 反射拨动 DaBR 总开关

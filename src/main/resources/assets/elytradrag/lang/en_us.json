@@ -2,12 +2,14 @@
   "key.elytradrag.category": "Elytra Drag",
   "key.elytradrag.brake": "Air Brake",
 
-  "elytradrag.configuration.dragMultiplier": "Drag Multiplier",
-  "elytradrag.configuration.dragMultiplier.tooltip": "Higher values mean stronger braking.\nRecommended: 2.0 ~ 10.0",
+  "elytradrag.configuration.common.client": "Client Settings",
+  "elytradrag.configuration.common.client.dragMultiplier": "Drag Multiplier",
+  "elytradrag.configuration.common.client.dragMultiplier.tooltip": "Higher values mean stronger braking.\nRecommended: 2.0 ~ 10.0",
 
-  "elytradrag.configuration.maxFallDistance": "Max Fall Distance",
-  "elytradrag.configuration.maxFallDistance.tooltip": "Prevents massive fall damage when diving at high speeds.",
+  "elytradrag.configuration.common.client.minimumSpeed": "Minimum Speed",
+  "elytradrag.configuration.common.client.minimumSpeed.tooltip": "Drag stops applying below this speed, preventing jittering while hovering.",
 
-  "elytradrag.configuration.minimumSpeed": "Minimum Speed",
-  "elytradrag.configuration.minimumSpeed.tooltip": "Drag stops applying below this speed, preventing jittering while hovering."
+  "elytradrag.configuration.common.server": "Server Settings",
+  "elytradrag.configuration.common.server.maxFallDistance": "Max Fall Distance",
+  "elytradrag.configuration.common.server.maxFallDistance.tooltip": "Prevents massive fall damage when diving at high speeds.\nNote: This option is controlled by the server."
 }
