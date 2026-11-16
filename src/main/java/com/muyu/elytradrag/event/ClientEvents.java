@@ -22,6 +22,8 @@ import java.lang.reflect.Field;
 public class ClientEvents {
 
     private static boolean wasBraking = false;
+    // 新增：记录踩刹车前 DaBR 到底开没开
+    private static boolean daBRWasEnabledBeforeBrake = true;
 
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
@@ -35,34 +37,33 @@ public class ClientEvents {
 
         boolean isBraking = KeyBindings.BRAKE_KEY.isDown();
 
-        // 1. 当刹车状态发生改变时，发送网络包给服务端！
+        // 1. 发包同步
         if (isBraking != wasBraking) {
             PacketDistributor.sendToServer(new BrakeStatePacket(isBraking));
         }
 
-        // 2. 踩刹车时的客户端逻辑
-        if (isBraking && !player.onGround()) {
-            // 核心修复：只有在玩家处于滑翔状态，或者具备滑翔条件时，才执行刹车逻辑
-            // 这里使用 player.isFallFlying() 是最严格的判定。如果你希望在刚起跳还没滑翔时也能按刹车，可以改成检测是否装备了鞘翅。
-            if (player.isFallFlying()) {
-                setDaBREnabled(false);
-                applyBrake(player);
-
-            // 锁死视角插值，防止画面抽搐
-            player.yRotO = player.getYRot();
-            player.xRotO = player.getXRot();
-            }
+        // 2. 踩刹车的瞬间（新增记录原始状态）
+        if (isBraking && !wasBraking) {
+            // 在关闭它之前，先看看玩家有没有在配置里关掉它
+            daBRWasEnabledBeforeBrake = ModConfig.INSTANCE.getModEnabled();
         }
 
-        // 3. 松开刹车的瞬间
+        // 3. 踩刹车时的逻辑
+        if (isBraking && !player.onGround() && player.isFallFlying()) {
+            setDaBREnabled(false);
+            applyBrake(player);
+
+            player.yRotO = player.getYRot();
+            player.xRotO = player.getXRot();
+        }
+
+        // 4. 松开刹车的瞬间
         if (wasBraking && !isBraking) {
-            // 清空实体 Roll
             if (player instanceof RollEntity rollEntity) {
                 rollEntity.doABarrelRoll$setRolling(false);
                 rollEntity.doABarrelRoll$setRoll(0.0f);
             }
 
-            // 强行重置视角动量
             float currentYaw = player.getYRot();
             float currentPitch = player.getXRot();
             player.setYRot(currentYaw);
@@ -70,16 +71,15 @@ public class ClientEvents {
             player.yRotO = currentYaw;
             player.xRotO = currentPitch;
 
-            // 清空 DaBR 内部平滑器的残余角动量
             clearDaBRSmoothers();
-            // 重新唤醒 DaBR
-            setDaBREnabled(true);
+
+            // 核心修复：恢复玩家进游戏时（或者刹车前）的状态，而不是强行设为 true！
+            setDaBREnabled(daBRWasEnabledBeforeBrake);
         }
 
         wasBraking = isBraking;
     }
 
-    // 纯减速逻辑（防摔已经抽离到服务端）
     private static void applyBrake(Player player) {
         Vec3 velocity = player.getDeltaMovement();
         double speed = velocity.length();
@@ -100,11 +100,8 @@ public class ClientEvents {
             player.setDeltaMovement(Vec3.ZERO);
             player.hurtMarked = true;
         }
-
-        // 注意：这里删掉了 FallProtection 的调用，因为它现在在服务端跑了！
     }
 
-    // 反射拨动 DaBR 总开关
     private static void setDaBREnabled(boolean enabled) {
         try {
             ModConfig.INSTANCE.setModEnabled(enabled);
@@ -113,7 +110,6 @@ public class ClientEvents {
         }
     }
 
-    // 反射清空平滑器
     private static void clearDaBRSmoothers() {
         try {
             Field yawField = DoABarrelRollClient.class.getDeclaredField("YAW_SMOOTHER");
