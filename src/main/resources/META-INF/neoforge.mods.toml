@@ -24,7 +24,4 @@ authors="${mod_authors}"
     ordering="NONE"
     side="BOTH"
 
-[[mixins]]
-config = "elytradrag.mixins.json"
-
 logoFile="assets/elytradrag/icon.png"
