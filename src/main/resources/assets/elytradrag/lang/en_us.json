@@ -9,5 +9,8 @@
   "elytradrag.configuration.minimumSpeed.tooltip": "Drag stops applying below this speed, preventing jittering while hovering.",
 
   "elytradrag.configuration.maxFallDistance": "Max Fall Distance",
-  "elytradrag.configuration.maxFallDistance.tooltip": "Prevents massive fall damage when diving at high speeds.\nNote: This option is controlled by the server in multiplayer."
+  "elytradrag.configuration.maxFallDistance.tooltip": "Prevents massive fall damage when diving at high speeds.\nNote: This option is controlled by the server in multiplayer.",
+
+  "elytradrag.configuration.removeKineticDamage": "Remove Kinetic Damage While Braking",
+  "elytradrag.configuration.removeKineticDamage.tooltip": "When enabled, flying into a wall while braking won't instantly kill you."
 }

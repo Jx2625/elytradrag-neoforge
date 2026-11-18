@@ -24,4 +24,11 @@ authors="${mod_authors}"
     ordering="NONE"
     side="BOTH"
 
+[[dependencies.elytradrag]]
+modId="do_a_barrel_roll"
+type="required"
+versionRange="[1.0,)"
+ordering="NONE"
+side="CLIENT"
+
 logoFile="assets/elytradrag/icon.png"

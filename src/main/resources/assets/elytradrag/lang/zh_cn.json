@@ -9,5 +9,8 @@
   "elytradrag.configuration.minimumSpeed.tooltip": "当速度低于此数值时，停止计算阻力，防止在空中悬停时抽搐。",
 
   "elytradrag.configuration.maxFallDistance": "最大摔落距离",
-  "elytradrag.configuration.maxFallDistance.tooltip": "防止在极速刹车俯冲时受到巨额摔落伤害。\n注意：本选项在联机时由服务端控制。"
+  "elytradrag.configuration.maxFallDistance.tooltip": "防止在极速刹车俯冲时受到巨额摔落伤害。\n注意：本选项在联机时由服务端控制。",
+  
+  "elytradrag.configuration.removeKineticDamage": "刹车时免去动能伤害",
+  "elytradrag.configuration.removeKineticDamage.tooltip": "开启后，高速俯冲刹车撞墙时不会被秒杀。"
 }

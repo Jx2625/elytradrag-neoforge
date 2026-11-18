@@ -45,6 +45,10 @@ public class ServerEvents {
     public static void onIncomingDamage(LivingIncomingDamageEvent event) {
         if (event.getEntity() instanceof Player player) {
             if (BRAKING_PLAYERS.contains(player.getUUID())) {
+                // 配置关闭 → 放行原版动能伤害
+                if (!ElytraDragConfig.INSTANCE.removeKineticDamage.get()) {
+                    return;
+                }
                 if (event.getSource().is(DamageTypes.FLY_INTO_WALL)) {
                     event.setCanceled(true);
                 }
