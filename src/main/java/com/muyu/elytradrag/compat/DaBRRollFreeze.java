@@ -3,6 +3,7 @@ package com.muyu.elytradrag.compat;
 import com.muyu.elytradrag.ElytraDragNeoForge;
 import net.minecraft.world.entity.player.Player;
 import nl.enjarai.doabarrelroll.DoABarrelRollClient;
+import nl.enjarai.doabarrelroll.ModEventsClient;
 import nl.enjarai.doabarrelroll.api.RollEntity;
 
 import java.lang.reflect.Field;
@@ -16,6 +17,14 @@ import java.lang.reflect.Field;
  * ModConfig 的持久化配置</b> —— 旧实现 {@code setModEnabled(false)} 会被 DaBR 的
  * {@code save()} 写进 {@code config/do_a_barrel_roll-client.json}，刹车期间崩溃/强杀
  * 就可能把 mod_enabled=false 留下来。
+ *
+ * <p>依赖策略：这是<b>硬依赖</b>（见 neoforge.mods.toml，{@code do_a_barrel_roll >= 3.7.5}）。
+ * 公开 API 一律直接引用；只剩两处只能反射，且都做了"失败只告警、不影响刹车本身"的降级：
+ * <ul>
+ *   <li>{@code Player.prevRoll} —— DaBR 的 mixin 注入到 Player 的字段，没有访问器；</li>
+ *   <li>{@code ModEventsClient.rollBack / lastRollBack} —— private static 字段，没有访问器。</li>
+ * </ul>
+ * 本类只在客户端被加载（引用方都标了 {@code Dist.CLIENT}），专服不会触碰。
  */
 public final class DaBRRollFreeze {
 
@@ -123,9 +132,9 @@ public final class DaBRRollFreeze {
         if (!rollBackResolved) {
             rollBackResolved = true;
             try {
-                Class<?> clazz = Class.forName("nl.enjarai.doabarrelroll.ModEventsClient");
-                Field rollBack = clazz.getDeclaredField("rollBack");
-                Field lastRollBack = clazz.getDeclaredField("lastRollBack");
+                // ModEventsClient 是硬依赖，直接取类对象；两个字段仍是 private static，只能反射
+                Field rollBack = ModEventsClient.class.getDeclaredField("rollBack");
+                Field lastRollBack = ModEventsClient.class.getDeclaredField("lastRollBack");
                 rollBack.setAccessible(true);
                 lastRollBack.setAccessible(true);
                 rollBackField = rollBack;

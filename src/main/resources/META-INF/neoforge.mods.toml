@@ -24,10 +24,13 @@ authors="${mod_authors}"
     ordering="NONE"
     side="BOTH"
 
+# DoABarrelRoll 是硬依赖：compat.DaBRRollFreeze 直接引用它的 public API
+# （RollGroup / RollEntity / DoABarrelRollClient），靠它实现"刹车时不翻滚"。
+# 下界 3.7.5 是 RollGroup.falseUnless(Supplier, int) 语义确认可用的最早版本。
 [[dependencies.elytradrag]]
 modId="do_a_barrel_roll"
 type="required"
-versionRange="[1.0,)"
+versionRange="[3.7.5,)"
 ordering="NONE"
 side="CLIENT"
 
