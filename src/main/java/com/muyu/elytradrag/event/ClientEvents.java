@@ -66,6 +66,14 @@ public class ClientEvents {
         DaBRRollFreeze.shutdown();
     }
 
+    /**
+     * 当前是否处于刹车状态（含"刚结束滑翔、仍受落地保护"的窗口）。
+     * 同端的其它事件（如烟花拦截）统一读这里，避免各自再写一份按键判断而慢慢分叉。
+     */
+    public static boolean isBraking() {
+        return braking;
+    }
+
     private static void updateGlideLatch(Player player) {
         if (player.isFallFlying()) {
             glideLatch = true;

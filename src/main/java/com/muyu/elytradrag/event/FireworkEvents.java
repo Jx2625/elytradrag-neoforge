@@ -1,7 +1,6 @@
 package com.muyu.elytradrag.event;
 
 import com.muyu.elytradrag.ElytraDragNeoForge;
-import com.muyu.elytradrag.KeyBindings;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Items;
 import net.neoforged.api.distmarker.Dist;
@@ -16,12 +15,12 @@ public class FireworkEvents {
     public static void onRightClickItem(PlayerInteractEvent.RightClickItem event) {
         Player player = event.getEntity();
 
-        // 如果玩家在滑翔，且手里拿的是烟花火箭
-        if (player.isFallFlying() && event.getItemStack().is(Items.FIREWORK_ROCKET)) {
-            // 如果按下了刹车键
-            if (KeyBindings.BRAKE_KEY.isDown()) {
-                event.setCanceled(true);
-            }
+        // 滑翔中拿着烟花、且正处在刹车状态 → 禁止右键消耗烟花（避免方向不对白扔一枚）
+        // 状态统一从 ClientEvents 读，不再单独判断按键，防止两套判断慢慢分叉
+        if (player.isFallFlying()
+                && event.getItemStack().is(Items.FIREWORK_ROCKET)
+                && ClientEvents.isBraking()) {
+            event.setCanceled(true);
         }
     }
 }
