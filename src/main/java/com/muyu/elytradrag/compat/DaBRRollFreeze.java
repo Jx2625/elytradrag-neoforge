@@ -45,6 +45,13 @@ public final class DaBRRollFreeze {
     /** 条件优先级必须低于 DaBR 自己的 trueIf(fall_flying, 0)，先求值才能短路成 false。 */
     private static final int CONDITION_PRIORITY = -1000;
 
+    /** 姿态键分组：松开哪一组，就清哪一轴的镜头平滑残留。 */
+    private static final int MASK_PITCH = 1;
+    private static final int MASK_YAW = 2;
+    private static final int MASK_ROLL = 4;
+    /** 上一 tick 的姿态键按下状态（仅新模式刹车期间使用）。 */
+    private static int prevAttitudeMask = 0;
+
     /**
      * 要跟物理输入对齐的 DaBR 飞行按键。
      * 翻滚键默认未绑定，玩家常见做法是绑到鼠标左右键 —— 正是会卡住的那类。
@@ -92,6 +99,45 @@ public final class DaBRRollFreeze {
         suppressRoll = false;
         clearSmoothers();
         clearRollBack();
+    }
+
+    /**
+     * 新模式：刹车开始。丢掉刹车前累积的镜头平滑残留，并记录当前姿态键状态。
+     * 只动平滑器的累积量，不改变当前姿态。
+     */
+    public static void beginDragOnlyBrake() {
+        clearSmoothers();
+        prevAttitudeMask = attitudeMask();
+    }
+
+    /**
+     * 新模式：刹车每 tick。任一姿态键松开时，清掉该轴剩余的平滑量 —— 松手即刻停住，
+     * 不会因为 DaBR 的镜头平滑继续转一段。
+     *
+     * <p>只在"松开"这一帧清，不在按住期间清：`SmoothDouble` 的输出是按累积缺口逐帧逼近的，
+     * 每 tick 清零等于每 tick 重新起算，反而会把按住时的输入吞掉。
+     */
+    public static void tickDragOnlyBrake() {
+        int mask = attitudeMask();
+        int released = prevAttitudeMask & ~mask;
+        if (released != 0) {
+            if ((released & MASK_PITCH) != 0) {
+                DoABarrelRollClient.PITCH_SMOOTHER.reset();
+            }
+            if ((released & MASK_YAW) != 0) {
+                DoABarrelRollClient.YAW_SMOOTHER.reset();
+            }
+            if ((released & MASK_ROLL) != 0) {
+                DoABarrelRollClient.ROLL_SMOOTHER.reset();
+            }
+        }
+        prevAttitudeMask = mask;
+    }
+
+    /** 新模式：刹车结束。清掉刹车期间残留的平滑量。 */
+    public static void endDragOnlyBrake() {
+        clearSmoothers();
+        prevAttitudeMask = 0;
     }
 
     /**
@@ -186,6 +232,21 @@ public final class DaBRRollFreeze {
         } catch (Throwable t) {
             ElytraDragNeoForge.LOGGER.debug("[ElytraDrag] 重置 DaBR 平滑器失败: {}", t.toString());
         }
+    }
+
+    /** 当前姿态键的按下情况，按轴聚合成一个位掩码。 */
+    private static int attitudeMask() {
+        int mask = 0;
+        if (ModKeybindings.PITCH_UP.isDown() || ModKeybindings.PITCH_DOWN.isDown()) {
+            mask |= MASK_PITCH;
+        }
+        if (ModKeybindings.YAW_LEFT.isDown() || ModKeybindings.YAW_RIGHT.isDown()) {
+            mask |= MASK_YAW;
+        }
+        if (ModKeybindings.ROLL_LEFT.isDown() || ModKeybindings.ROLL_RIGHT.isDown()) {
+            mask |= MASK_ROLL;
+        }
+        return mask;
     }
 
     private static void clearRollBack() {

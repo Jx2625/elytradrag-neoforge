@@ -12,5 +12,8 @@
   "elytradrag.configuration.maxFallDistance.tooltip": "防止在极速刹车俯冲时受到巨额摔落伤害。\n注意：本选项在联机时由服务端控制。",
 
   "elytradrag.configuration.removeKineticDamage": "刹车时免去动能伤害",
-  "elytradrag.configuration.removeKineticDamage.tooltip": "开启后，高速俯冲刹车撞墙时不会被秒杀。"
+  "elytradrag.configuration.removeKineticDamage.tooltip": "开启后，高速俯冲刹车撞墙时不会被秒杀。",
+
+  "elytradrag.configuration.keepDaBREnabledWhileBraking": "刹车只减速（保留 DoABarrelRoll）",
+  "elytradrag.configuration.keepDaBREnabledWhileBraking.tooltip": "开启后，刹车只施加阻力：DoABarrelRoll 照常运行，翻滚、偏航、视角都不受影响，松开按键也不会继续转。\n关闭则回到旧行为：刹车期间临时压制 DoABarrelRoll 的翻滚组并把视角回正。"
 }

@@ -31,6 +31,10 @@ public class ClientEvents {
     private static boolean glideLatch = false;
     /** 连续贴地 tick 数，用于滑翔结束后保留一小段刹车保护。 */
     private static int groundedTicks = 0;
+    /** 当前是否处于"刹车压制 DaBR"的旧模式；只由 keepDaBREnabledWhileBraking=false 时启用。 */
+    private static boolean frozen = false;
+    /** 当前是否处于"刹车只减速、DaBR 照常"的新模式。 */
+    private static boolean dragOnly = false;
 
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
@@ -48,16 +52,33 @@ public class ClientEvents {
 
         // 每 tick 把 DaBR 的飞行按键对齐物理输入：刹车会短暂关掉它的输入 context，
         // 若不补同步，绑在鼠标上的翻滚键会在松开后一直"按住"（视角自转）。
+        // 新模式不再切 context，但落地等场景仍会切，所以这条一直保留。
         DaBRRollFreeze.syncMovementKeys();
 
         // 只有"真的在滑翔（或刚结束滑翔还在空中/刚落地的几个 tick）"才允许刹车。
         boolean wantBrake = KeyBindings.BRAKE_KEY.isDown() && glideLatch;
-        setBraking(mc, player, wantBrake);
+        setBraking(mc, wantBrake);
 
-        if (braking && player.isFallFlying() && !player.onGround()) {
+        boolean keepDaBR = ElytraDragConfig.INSTANCE.keepDaBREnabledWhileBraking.get();
+        setFrozen(player, braking && !keepDaBR);
+        setDragOnly(braking && keepDaBR);
+
+        if (!braking) {
+            return;
+        }
+
+        // 刹车只做一件事：施加阻力
+        if (player.isFallFlying() && !player.onGround()) {
             applyBrake(player);
+        }
+
+        if (frozen) {
+            // 旧模式：压制 DaBR 期间锁住视角插值，避免和"冻结中"的 DaBR 打架
             player.yRotO = player.getYRot();
             player.xRotO = player.getXRot();
+        } else if (dragOnly) {
+            // 新模式：不碰姿态，只在按键松开时清掉该轴的平滑残留，避免松手后继续转
+            DaBRRollFreeze.tickDragOnlyBrake();
         }
     }
 
@@ -65,6 +86,8 @@ public class ClientEvents {
     public static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
         // 兜底：断开连接/退出世界时把状态全部归零，不给 DaBR 留任何残留
         braking = false;
+        frozen = false;
+        dragOnly = false;
         glideLatch = false;
         groundedTicks = 0;
         DaBRRollFreeze.shutdown();
@@ -92,12 +115,20 @@ public class ClientEvents {
         }
     }
 
-    private static void setBraking(Minecraft mc, Player player, boolean want) {
+    private static void setBraking(Minecraft mc, boolean want) {
         if (want == braking) {
             return;
         }
         braking = want;
         sendBrakeState(mc, want);
+    }
+
+    /** 切换"是否压制 DaBR"这一层状态（仅旧模式会真正压制）。 */
+    private static void setFrozen(Player player, boolean want) {
+        if (want == frozen) {
+            return;
+        }
+        frozen = want;
         if (want) {
             DaBRRollFreeze.beginBrake(player);
         } else {
@@ -105,22 +136,45 @@ public class ClientEvents {
         }
     }
 
+    /** 切换"刹车只减速"这一层状态（新模式）。 */
+    private static void setDragOnly(boolean want) {
+        if (want == dragOnly) {
+            return;
+        }
+        dragOnly = want;
+        if (want) {
+            DaBRRollFreeze.beginDragOnlyBrake();
+        } else {
+            DaBRRollFreeze.endDragOnlyBrake();
+        }
+    }
+
     /** 把本地状态和上报状态一起清掉；会补发 false 包，避免服务端残留。 */
     private static void stopBraking(Minecraft mc, Player player) {
         glideLatch = false;
         groundedTicks = 0;
+
+        if (dragOnly) {
+            dragOnly = false;
+            DaBRRollFreeze.endDragOnlyBrake();
+        }
+
+        if (frozen) {
+            frozen = false;
+            if (player != null) {
+                DaBRRollFreeze.endBrake(player);
+            } else {
+                // 玩家对象短暂不存在（换维度/重生）：没有实体可清 roll，但必须解除翻滚抑制，
+                // 否则 suppressRoll 会一直挂在那里，之后滑翔时 DaBR 永远不翻滚。
+                DaBRRollFreeze.shutdown();
+            }
+        }
+
         if (!braking) {
             return;
         }
         braking = false;
         sendBrakeState(mc, false);
-        if (player != null) {
-            DaBRRollFreeze.endBrake(player);
-        } else {
-            // 玩家对象短暂不存在（换维度/重生）：没有实体可清 roll，但必须解除翻滚抑制，
-            // 否则 suppressRoll 会一直挂在那里，之后滑翔时 DaBR 永远不翻滚。
-            DaBRRollFreeze.shutdown();
-        }
     }
 
     private static void sendBrakeState(Minecraft mc, boolean isBraking) {

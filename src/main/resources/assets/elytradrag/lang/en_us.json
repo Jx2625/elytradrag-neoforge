@@ -12,5 +12,8 @@
   "elytradrag.configuration.maxFallDistance.tooltip": "Prevents massive fall damage when diving at high speeds.\nNote: This option is controlled by the server in multiplayer.",
 
   "elytradrag.configuration.removeKineticDamage": "Remove Kinetic Damage While Braking",
-  "elytradrag.configuration.removeKineticDamage.tooltip": "When enabled, flying into a wall while braking won't instantly kill you."
+  "elytradrag.configuration.removeKineticDamage.tooltip": "When enabled, flying into a wall while braking won't instantly kill you.",
+
+  "elytradrag.configuration.keepDaBREnabledWhileBraking": "Brake Only Slows You Down",
+  "elytradrag.configuration.keepDaBREnabledWhileBraking.tooltip": "When enabled, braking only applies drag. DoABarrelRoll keeps running, so roll, yaw and the view stay untouched, and nothing keeps turning after releasing a key.\nWhen disabled, braking temporarily suppresses DoABarrelRoll's rolling group and levels the view (older behaviour)."
 }
