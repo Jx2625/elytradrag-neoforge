@@ -8,6 +8,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.living.LivingFallEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -19,11 +20,28 @@ public class ServerEvents {
     private static final Set<UUID> BRAKING_PLAYERS = new HashSet<>();
 
     public static void handleBrakeState(Player player, boolean isBraking) {
-        if (isBraking) {
+        if (player == null) {
+            return;
+        }
+        // 兜底校验：客户端异常/包乱序时，只认"在空中（正在滑翔）"的刹车上报。
+        // 站着按 Shift 不再能把 UUID 塞进来，也不会顺带截断落地摔落伤害。
+        boolean accepted = isBraking && (player.isFallFlying() || !player.onGround());
+        if (accepted) {
             BRAKING_PLAYERS.add(player.getUUID());
         } else {
             BRAKING_PLAYERS.remove(player.getUUID());
         }
+    }
+
+    // 0. 玩家断开/重生时清掉残留标记，避免 UUID 泄漏 / 同 UUID 重连或重生继承旧状态
+    @SubscribeEvent
+    public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
+        BRAKING_PLAYERS.remove(event.getEntity().getUUID());
+    }
+
+    @SubscribeEvent
+    public static void onPlayerRespawn(PlayerEvent.PlayerRespawnEvent event) {
+        BRAKING_PLAYERS.remove(event.getEntity().getUUID());
     }
 
     // 1. 拦截摔落伤害，并截断到配置的距离

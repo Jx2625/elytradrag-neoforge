@@ -1,15 +1,32 @@
 package com.muyu.elytradrag.compat;
 
-import nl.enjarai.doabarrelroll.api.RollEntity;
-import nl.enjarai.doabarrelroll.config.ModConfig;
+import com.muyu.elytradrag.ElytraDragNeoForge;
 import net.minecraft.world.entity.player.Player;
+import nl.enjarai.doabarrelroll.DoABarrelRollClient;
+import nl.enjarai.doabarrelroll.api.RollEntity;
 
 import java.lang.reflect.Field;
 
+/**
+ * 刹车期间"临时不翻滚"的 DaBR 兼容层。
+ *
+ * <p>实现方式：向 DaBR 的 {@code fall_flying} 滚动条件组注入一条 {@code falseUnless} 条件，
+ * 刹车时让 {@code RollEvents.shouldRoll()} 返回 false。效果等价于玩家自己把 DaBR 关掉
+ * （{@code LocalPlayer} 每 tick 用 shouldRoll() 刷新 rolling 状态），但<b>完全不动
+ * ModConfig 的持久化配置</b> —— 旧实现 {@code setModEnabled(false)} 会被 DaBR 的
+ * {@code save()} 写进 {@code config/do_a_barrel_roll-client.json}，刹车期间崩溃/强杀
+ * 就可能把 mod_enabled=false 留下来。
+ */
 public final class DaBRRollFreeze {
 
-    private static Boolean daBRWasEnabled = null;
-    private static boolean active = false;
+    /** 条件优先级必须低于 DaBR 自己的 trueIf(fall_flying, 0)，先求值才能短路成 false。 */
+    private static final int CONDITION_PRIORITY = -1000;
+
+    private static boolean suppressRoll = false;
+    private static boolean conditionRegistered = false;
+
+    private static Field prevRollField;
+    private static boolean prevRollResolved = false;
 
     private static Field rollBackField;
     private static Field lastRollBackField;
@@ -17,81 +34,116 @@ public final class DaBRRollFreeze {
 
     private DaBRRollFreeze() {}
 
-    public static void beginBrake() {
-        try {
-            if (daBRWasEnabled == null) {
-                daBRWasEnabled = ModConfig.INSTANCE.getModEnabled();
-            }
-            ModConfig.INSTANCE.setModEnabled(false);
-            active = true;
-        } catch (Exception ignored) {}
+    /** 进入刹车：立刻停掉翻滚，并把己方 roll 归零。 */
+    public static void beginBrake(Player player) {
+        registerCondition();
+        suppressRoll = true;
+        resetRoll(player);
     }
 
+    /** 退出刹车：恢复 DaBR 的正常行为，并清掉平滑器/回滚残留，避免松手时视角被甩一下。 */
     public static void endBrake(Player player) {
+        suppressRoll = false;
+        resetRoll(player);
+        clearSmoothers();
+        clearRollBack();
+    }
+
+    /** 退出世界/客户端停止/无玩家可用时：复位内存状态（没有任何持久化副作用）。 */
+    public static void shutdown() {
+        suppressRoll = false;
+        clearSmoothers();
+        clearRollBack();
+    }
+
+    /**
+     * 往 DaBR 的滚动条件组里挂一条"刹车时禁止翻滚"的条件。
+     * 只注册一次；条件本身通过静态字段实时读取，所以不需要反复注册/反注册。
+     */
+    private static void registerCondition() {
+        if (conditionRegistered) {
+            return;
+        }
+        conditionRegistered = true;
+        try {
+            DoABarrelRollClient.FALL_FLYING_GROUP.falseUnless(() -> !suppressRoll, CONDITION_PRIORITY);
+        } catch (Throwable t) {
+            ElytraDragNeoForge.LOGGER.warn(
+                    "[ElytraDrag] 注册 DaBR 翻滚抑制条件失败，刹车期间将无法暂时禁用翻滚", t);
+        }
+    }
+
+    private static void resetRoll(Player player) {
         if (player instanceof RollEntity rollEntity) {
             try {
                 rollEntity.doABarrelRoll$setRolling(false);
                 rollEntity.doABarrelRoll$setRoll(0.0f);
-            } catch (Exception ignored) {}
+            } catch (Throwable t) {
+                ElytraDragNeoForge.LOGGER.debug("[ElytraDrag] 调用 DaBR 翻滚接口失败: {}", t.toString());
+            }
         }
-
-        // 关键：清 PlayerMixin 的 prevRoll（上次转动残留）
+        // 关键：清 PlayerMixin 的 prevRoll（上次转动残留），否则松手瞬间视线会跳一下
         clearPrevRoll(player);
-
-        clearRollBack();
-        clearSmoothers();
-
-        if (daBRWasEnabled != null) {
-            try {
-                ModConfig.INSTANCE.setModEnabled(daBRWasEnabled);
-            } catch (Exception ignored) {}
-            daBRWasEnabled = null;
-        }
-        active = false;
     }
 
     private static void clearPrevRoll(Player player) {
-        try {
-            Field f = Player.class.getDeclaredField("prevRoll");
-            f.setAccessible(true);
-            f.setFloat(player, 0.0f);
-            System.out.println("[ElytraDrag] clearPrevRoll OK");
-        } catch (Throwable t) {
-            System.out.println("[ElytraDrag] clearPrevRoll FAILED: " + t);
-        }
-    }
-
-    private static void clearRollBack() {
-        try {
-            if (!rollBackResolved) {
-                Class<?> clazz = Class.forName("nl.enjarai.doabarrelroll.ModEventsClient");
-                rollBackField = clazz.getDeclaredField("rollBack");
-                lastRollBackField = clazz.getDeclaredField("lastRollBack");
-                rollBackField.setAccessible(true);
-                lastRollBackField.setAccessible(true);
-                rollBackResolved = true;
+        if (!prevRollResolved) {
+            prevRollResolved = true;
+            try {
+                Field field = Player.class.getDeclaredField("prevRoll");
+                field.setAccessible(true);
+                prevRollField = field;
+            } catch (Throwable t) {
+                ElytraDragNeoForge.LOGGER.warn(
+                        "[ElytraDrag] 找不到 DaBR 注入的 Player.prevRoll 字段，刹车回正可能不完整: {}",
+                        t.toString());
             }
-            rollBackField.setFloat(null, 0.0f);
-            lastRollBackField.setFloat(null, 0.0f);
+        }
+        if (prevRollField == null) {
+            return;
+        }
+        try {
+            prevRollField.setFloat(player, 0.0f);
         } catch (Throwable t) {
-            rollBackResolved = false;
-            rollBackField = null;
-            lastRollBackField = null;
+            ElytraDragNeoForge.LOGGER.debug("[ElytraDrag] 重置 prevRoll 失败: {}", t.toString());
         }
     }
 
     private static void clearSmoothers() {
         try {
-            Class<?> clientClass = Class.forName("nl.enjarai.doabarrelroll.DoABarrelRollClient");
-            String[] names = {"PITCH_SMOOTHER", "YAW_SMOOTHER", "ROLL_SMOOTHER"};
-            for (String name : names) {
-                Field f = clientClass.getDeclaredField(name);
-                f.setAccessible(true);
-                Object smoother = f.get(null);
-                if (smoother != null) {
-                    smoother.getClass().getMethod("reset").invoke(smoother);
-                }
+            DoABarrelRollClient.PITCH_SMOOTHER.reset();
+            DoABarrelRollClient.YAW_SMOOTHER.reset();
+            DoABarrelRollClient.ROLL_SMOOTHER.reset();
+        } catch (Throwable t) {
+            ElytraDragNeoForge.LOGGER.debug("[ElytraDrag] 重置 DaBR 平滑器失败: {}", t.toString());
+        }
+    }
+
+    private static void clearRollBack() {
+        if (!rollBackResolved) {
+            rollBackResolved = true;
+            try {
+                Class<?> clazz = Class.forName("nl.enjarai.doabarrelroll.ModEventsClient");
+                Field rollBack = clazz.getDeclaredField("rollBack");
+                Field lastRollBack = clazz.getDeclaredField("lastRollBack");
+                rollBack.setAccessible(true);
+                lastRollBack.setAccessible(true);
+                rollBackField = rollBack;
+                lastRollBackField = lastRollBack;
+            } catch (Throwable t) {
+                ElytraDragNeoForge.LOGGER.warn(
+                        "[ElytraDrag] 找不到 DaBR 的 rollBack 字段，刹车结束时视角可能残留一点滚转: {}",
+                        t.toString());
             }
-        } catch (Throwable t) {}
+        }
+        if (rollBackField == null || lastRollBackField == null) {
+            return;
+        }
+        try {
+            rollBackField.setFloat(null, 0.0f);
+            lastRollBackField.setFloat(null, 0.0f);
+        } catch (Throwable t) {
+            ElytraDragNeoForge.LOGGER.debug("[ElytraDrag] 重置 DaBR rollBack 失败: {}", t.toString());
+        }
     }
 }
