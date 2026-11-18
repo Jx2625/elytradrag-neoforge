@@ -5,6 +5,8 @@ import com.muyu.elytradrag.ElytraDragNeoForge;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.player.Player;
+import net.neoforged.neoforge.client.settings.IKeyConflictContext;
+import net.neoforged.neoforge.client.settings.KeyConflictContext;
 import nl.enjarai.doabarrelroll.DoABarrelRollClient;
 import nl.enjarai.doabarrelroll.ModEventsClient;
 import nl.enjarai.doabarrelroll.ModKeybindings;
@@ -52,6 +54,11 @@ public final class DaBRRollFreeze {
     /** 上一 tick 的姿态键按下状态（仅新模式刹车期间使用）。 */
     private static int prevAttitudeMask = 0;
 
+    /** 飞行键原来的 conflict context，用于刹车结束后还原。 */
+    private static final java.util.IdentityHashMap<KeyMapping, IKeyConflictContext> ORIGINAL_CONTEXTS
+            = new java.util.IdentityHashMap<>();
+    private static boolean movementKeysUnrestricted = false;
+
     /**
      * 要跟物理输入对齐的 DaBR 飞行按键。
      * 翻滚键默认未绑定，玩家常见做法是绑到鼠标左右键 —— 正是会卡住的那类。
@@ -97,8 +104,43 @@ public final class DaBRRollFreeze {
     /** 退出世界/客户端停止/无玩家可用时：复位内存状态（没有任何持久化副作用）。 */
     public static void shutdown() {
         suppressRoll = false;
+        setMovementKeysUnrestricted(false);
         clearSmoothers();
         clearRollBack();
+    }
+
+    /**
+     * 刹车期间临时把 DaBR 飞行键的 conflict context 换成 {@code IN_GAME}，让它们在按住 Shift
+     * （刹车键）时仍然有效。
+     *
+     * <p>原因：NeoForge 的 {@code KeyModifier.NONE.isActive(context)} 在"按键 context 与
+     * {@code IN_GAME} 不冲突"时会遍历当前按下的 Ctrl/Shift/Alt，只要有修饰键按着就返回 false。
+     * DaBR 的飞行键用的正是这种自定义 context（为了避免和原版 A/D 冲突），于是按住 Shift 刹车时
+     * A/D、鼠标左右键全部被判成"没按下"——鼠标移动不走 KeyMapping，所以只有鼠标能转。
+     *
+     * <p>换成 {@code IN_GAME} 后，context 与自己冲突，修饰键检查被跳过，按键恢复正常读取。
+     * 只在刹车期间生效，刹车结束立刻还原，不写任何持久化数据。
+     */
+    public static void setMovementKeysUnrestricted(boolean unrestricted) {
+        if (unrestricted == movementKeysUnrestricted) {
+            return;
+        }
+        movementKeysUnrestricted = unrestricted;
+        for (KeyMapping mapping : MOVEMENT_KEYS) {
+            try {
+                if (unrestricted) {
+                    ORIGINAL_CONTEXTS.putIfAbsent(mapping, mapping.getKeyConflictContext());
+                    mapping.setKeyConflictContext(KeyConflictContext.IN_GAME);
+                } else {
+                    var original = ORIGINAL_CONTEXTS.get(mapping);
+                    if (original != null) {
+                        mapping.setKeyConflictContext(original);
+                    }
+                }
+            } catch (Throwable t) {
+                ElytraDragNeoForge.LOGGER.debug("[ElytraDrag] 切换按键 context 失败: {}", t.toString());
+            }
+        }
     }
 
     /**

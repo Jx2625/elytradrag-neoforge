@@ -144,7 +144,11 @@ public class ClientEvents {
         dragOnly = want;
         if (want) {
             DaBRRollFreeze.beginDragOnlyBrake();
+            // 刹车键默认是 Shift，NeoForge 会把按住的修饰键当成"这些键没激活"，
+            // 所以刹车期间临时把 DaBR 飞行键的 context 放开，否则 A/D、鼠标左右键全部失效。
+            DaBRRollFreeze.setMovementKeysUnrestricted(true);
         } else {
+            DaBRRollFreeze.setMovementKeysUnrestricted(false);
             DaBRRollFreeze.endDragOnlyBrake();
         }
     }
@@ -156,6 +160,7 @@ public class ClientEvents {
 
         if (dragOnly) {
             dragOnly = false;
+            DaBRRollFreeze.setMovementKeysUnrestricted(false);
             DaBRRollFreeze.endDragOnlyBrake();
         }
 
