@@ -1,12 +1,18 @@
 package com.muyu.elytradrag.compat;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import com.muyu.elytradrag.ElytraDragNeoForge;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.player.Player;
 import nl.enjarai.doabarrelroll.DoABarrelRollClient;
 import nl.enjarai.doabarrelroll.ModEventsClient;
+import nl.enjarai.doabarrelroll.ModKeybindings;
 import nl.enjarai.doabarrelroll.api.RollEntity;
+import org.lwjgl.glfw.GLFW;
 
 import java.lang.reflect.Field;
+import java.util.List;
 
 /**
  * 刹车期间"临时不翻滚"的 DaBR 兼容层。
@@ -17,6 +23,14 @@ import java.lang.reflect.Field;
  * ModConfig 的持久化配置</b> —— 旧实现 {@code setModEnabled(false)} 会被 DaBR 的
  * {@code save()} 写进 {@code config/do_a_barrel_roll-client.json}，刹车期间崩溃/强杀
  * 就可能把 mod_enabled=false 留下来。
+ *
+ * <p><b>翻滚键卡住的问题</b>：让滚动条件组变 false 等于把 DaBR 的输入 context 关掉，
+ * 而 NeoForge 在 context 不活跃时会丢弃这个按键事件流（连"松开"都丢，见
+ * {@code KeyMappingLookup#getAll} 的 {@code isActiveAndMatches} 过滤）。DaBR 自己在
+ * context 重新激活时会补同步（{@code InputContextImpl#syncHeldKeys}），但<b>只补键盘，
+ * 刻意跳过鼠标键</b>。所以"按住绑在鼠标上的翻滚键 → 刹车 → 松开鼠标"会让该键永远停在
+ * 按下状态，刹车结束后视角就会绕视轴自转不停。{@link #syncMovementKeys()} 每 tick 用
+ * GLFW 的物理状态覆盖 DaBR 的飞行按键（键盘 + 鼠标），把这个洞补上。
  *
  * <p>依赖策略：这是<b>硬依赖</b>（见 neoforge.mods.toml，{@code do_a_barrel_roll >= 3.7.5}）。
  * 公开 API 一律直接引用；只剩两处只能反射，且都做了"失败只告警、不影响刹车本身"的降级：
@@ -30,6 +44,21 @@ public final class DaBRRollFreeze {
 
     /** 条件优先级必须低于 DaBR 自己的 trueIf(fall_flying, 0)，先求值才能短路成 false。 */
     private static final int CONDITION_PRIORITY = -1000;
+
+    /**
+     * 要跟物理输入对齐的 DaBR 飞行按键。
+     * 翻滚键默认未绑定，玩家常见做法是绑到鼠标左右键 —— 正是会卡住的那类。
+     */
+    private static final List<KeyMapping> MOVEMENT_KEYS = List.of(
+            ModKeybindings.PITCH_UP,
+            ModKeybindings.PITCH_DOWN,
+            ModKeybindings.YAW_LEFT,
+            ModKeybindings.YAW_RIGHT,
+            ModKeybindings.ROLL_LEFT,
+            ModKeybindings.ROLL_RIGHT,
+            ModKeybindings.THRUST_FORWARD,
+            ModKeybindings.THRUST_BACKWARD
+    );
 
     private static boolean suppressRoll = false;
     private static boolean conditionRegistered = false;
@@ -63,6 +92,37 @@ public final class DaBRRollFreeze {
         suppressRoll = false;
         clearSmoothers();
         clearRollBack();
+    }
+
+    /**
+     * 把 DaBR 的飞行按键 raw 状态强制对齐到物理输入（键盘 + 鼠标）。
+     *
+     * <p>为什么需要：我们的刹车会让 DaBR 的 {@code fall_flying} 输入 context 失效，而 NeoForge
+     * 在 context 失效期间丢弃该按键事件流（含释放）。DaBR 只在 context 重新激活时补同步一次，
+     * 且跳过鼠标键，于是鼠标绑定的翻滚键会永久停在按下，刹车结束后视角自转。这里每 tick 覆盖
+     * 一遍，顺带也修掉 DaBR 自己的"落地时按着翻滚鼠标键"同款残留。
+     *
+     * <p>只写 {@link KeyMapping#setDown(boolean)}，不碰 click 计数，也不影响其它任何按键。
+     */
+    public static void syncMovementKeys() {
+        Minecraft mc = Minecraft.getInstance();
+        // 界面里鼠标是在操作 GUI，不代表飞行输入，跳过；回到游戏后的第一个 tick 会补上
+        if (mc.player == null || mc.screen != null) {
+            return;
+        }
+
+        long window = mc.getWindow().getWindow();
+        for (KeyMapping mapping : MOVEMENT_KEYS) {
+            InputConstants.Key key = mapping.getKey();
+            if (key.getType() == InputConstants.Type.MOUSE) {
+                // 鼠标键不能用 InputConstants.isKeyDown（那是 glfwGetKey，只对键盘有效）
+                mapping.setDown(GLFW.glfwGetMouseButton(window, key.getValue()) == GLFW.GLFW_PRESS);
+            } else if (key.getType() == InputConstants.Type.KEYSYM
+                    && key.getValue() != InputConstants.UNKNOWN.getValue()) {
+                mapping.setDown(InputConstants.isKeyDown(window, key.getValue()));
+            }
+            // 未绑定的键保持原样（没人会读它）
+        }
     }
 
     /**
