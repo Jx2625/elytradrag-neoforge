@@ -50,11 +50,6 @@ public class ClientEvents {
 
         updateGlideLatch(player);
 
-        // 每 tick 把 DaBR 的飞行按键对齐物理输入：刹车会短暂关掉它的输入 context，
-        // 若不补同步，绑在鼠标上的翻滚键会在松开后一直"按住"（视角自转）。
-        // 新模式不再切 context，但落地等场景仍会切，所以这条一直保留。
-        DaBRRollFreeze.syncMovementKeys();
-
         // 只有"真的在滑翔（或刚结束滑翔还在空中/刚落地的几个 tick）"才允许刹车。
         boolean wantBrake = KeyBindings.BRAKE_KEY.isDown() && glideLatch;
         setBraking(mc, wantBrake);
@@ -144,11 +139,7 @@ public class ClientEvents {
         dragOnly = want;
         if (want) {
             DaBRRollFreeze.beginDragOnlyBrake();
-            // 刹车键默认是 Shift，NeoForge 会把按住的修饰键当成"这些键没激活"，
-            // 所以刹车期间临时把 DaBR 飞行键的 context 放开，否则 A/D、鼠标左右键全部失效。
-            DaBRRollFreeze.setMovementKeysUnrestricted(true);
         } else {
-            DaBRRollFreeze.setMovementKeysUnrestricted(false);
             DaBRRollFreeze.endDragOnlyBrake();
         }
     }
@@ -160,7 +151,6 @@ public class ClientEvents {
 
         if (dragOnly) {
             dragOnly = false;
-            DaBRRollFreeze.setMovementKeysUnrestricted(false);
             DaBRRollFreeze.endDragOnlyBrake();
         }
 
