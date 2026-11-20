@@ -5,8 +5,7 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [],
   "client": [
-    "DaBRYawMixin",
-    "PlayerShiftMixin"
+    "DaBRYawMixin"
   ],
   "injectors": {
     "defaultRequire": 1

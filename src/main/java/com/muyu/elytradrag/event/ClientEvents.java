@@ -42,12 +42,16 @@ public class ClientEvents {
 
         // 2. 踩刹车时的客户端逻辑
         if (isBraking && !player.onGround()) {
-            setDaBREnabled(false);
-            applyBrake(player);
+            // 核心修复：只有在玩家处于滑翔状态，或者具备滑翔条件时，才执行刹车逻辑
+            // 这里使用 player.isFallFlying() 是最严格的判定。如果你希望在刚起跳还没滑翔时也能按刹车，可以改成检测是否装备了鞘翅。
+            if (player.isFallFlying()) {
+                setDaBREnabled(false);
+                applyBrake(player);
 
             // 锁死视角插值，防止画面抽搐
             player.yRotO = player.getYRot();
             player.xRotO = player.getXRot();
+            }
         }
 
         // 3. 松开刹车的瞬间
@@ -92,11 +96,9 @@ public class ClientEvents {
 
             player.setDeltaMovement(newVelocity);
             player.hurtMarked = true;
-            player.startFallFlying();
         } else {
             player.setDeltaMovement(Vec3.ZERO);
             player.hurtMarked = true;
-            player.startFallFlying();
         }
 
         // 注意：这里删掉了 FallProtection 的调用，因为它现在在服务端跑了！

@@ -26,3 +26,5 @@ authors="${mod_authors}"
 
 [[mixins]]
 config = "elytradrag.mixins.json"
+
+logoFile="assets/elytradrag/icon.png"
