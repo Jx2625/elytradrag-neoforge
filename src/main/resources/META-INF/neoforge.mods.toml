@@ -26,11 +26,12 @@ authors="${mod_authors}"
 
 # DoABarrelRoll 是硬依赖：compat.DaBRRollFreeze 直接引用它的 public API
 # （RollGroup / RollEntity / DoABarrelRollClient），靠它实现"刹车时不翻滚"。
-# 下界 3.7.5 是 RollGroup.falseUnless(Supplier, int) 语义确认可用的最早版本。
+# 下界 3.8.2：从这一版起 DaBR 自己修掉了"输入 context 失效 / 按住修饰键"时丢按键事件的
+# 问题，本项目因此删掉了键盘状态的兜底逻辑，不再兼容更早的版本。
 [[dependencies.elytradrag]]
 modId="do_a_barrel_roll"
 type="required"
-versionRange="[3.7.5,)"
+versionRange="[3.8.2,)"
 ordering="NONE"
 side="CLIENT"
 

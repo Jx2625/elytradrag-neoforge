@@ -36,7 +36,7 @@ dependencies {
     // NeoForge 本体
     implementation "net.neoforged:neoforge:${neo_version}"
 
-    compileOnly files('libs/DoAnotherBarrelRoll-3.8.0+1.21.1.jar')
+    compileOnly files('libs/DoAnotherBarrelRoll-3.8.2+1.21.1.jar')
 }
 
 tasks.withType(ProcessResources).configureEach {
